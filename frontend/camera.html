@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Scan Billboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      background: black;
+      overflow: hidden;
+    }
+    video, canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+    }
+  </style>
+</head>
+<body>
+
+<video id="video" autoplay muted playsinline></video>
+<canvas id="canvas"></canvas>
+
+<script>
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+// Load client ad image (make sure it's in same folder or update path)
+const ad = new Image();
+ad.src = 'assets/Amazon.jpg'; // or use full path if needed
+
+// Start the camera
+navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+  .then(stream => {
+    video.srcObject = stream;
+    video.onloadedmetadata = () => {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      detectLoop();
+    };
+  })
+  .catch(err => alert("Camera access denied or not available."));
+
+function detectLoop() {
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const frameData = canvas.toDataURL('image/jpeg');
+
+  fetch('http://localhost:5000/api/detect', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: frameData })
+  })
+  .then(res => res.json())
+  .then(detections => {
+    // Redraw base video frame
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // Draw client ad image over each detected box
+    detections.forEach(box => {
+      ctx.drawImage(ad, box.x, box.y, box.w, box.h);
+    });
+
+    // Loop again
+    requestAnimationFrame(detectLoop);
+  })
+  .catch(() => {
+    // On error, just continue
+    requestAnimationFrame(detectLoop);
+  });
+}
+</script>
+
+</body>
+</html>
