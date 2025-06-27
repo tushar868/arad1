@@ -68,65 +68,42 @@
   <button id="postButton">Post on Twitter</button>
 
   <script>
-    const video = document.getElementById('videoElement');
-    const overlayImage = document.getElementById('overlayImage');
-    const loading = document.getElementById('loading');
-    const postButton = document.getElementById('postButton');
+let canvas = document.getElementById("canvas");
+let context = canvas.getContext("2d");
+let video = document.getElementById("videoElement");
 
-    // Start Camera
-    navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: 'environment',
-        width: { ideal: 640 },
-        height: { ideal: 480 }
+navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+  .then((stream) => {
+    video.srcObject = stream;
+    video.play();
+  });
+
+function scan() {
+  // Wait 2 seconds to ensure curtain is visible
+  setTimeout(() => {
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    let imageData = canvas.toDataURL("image/jpeg");
+
+    fetch("https://demo.bytespathteam.in/detect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image: imageData })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.found) {
+        alert("✅ Billboard Found");
+      } else {
+        alert("❌ Billboard Not Found");
       }
-    }).then(stream => {
-      video.srcObject = stream;
-    }).catch(err => {
-      alert("Camera error: " + err);
+    })
+    .catch(err => {
+      console.error("Detection Error:", err);
     });
+  }, 2000);  // Delay after curtain
+}
+</script>
 
-    // Take frame after 4s and send to /detect
-    setTimeout(() => {
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const base64Image = canvas.toDataURL('image/jpeg');
-
-      fetch('https://demo.bytespathteam.in/detect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64Image })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success || data.predicted === true) {
-          overlayImage.style.display = 'block';
-          loading.style.display = 'none';
-          // Delay 2s before showing post button
-          setTimeout(() => {
-            postButton.style.display = 'block';
-          }, 2000);
-        } else {
-          loading.innerText = 'No billboard found.';
-        }
-      })
-      .catch(err => {
-        console.error('Detection error:', err);
-        loading.innerText = 'Detection failed.';
-      });
-    }, 4000);
-
-    // Twitter Post
-    postButton.onclick = () => {
-      const tweetText = encodeURIComponent("Check out this amazing ad! #AdReveal");
-      const imageUrl = encodeURIComponent("https://demo.bytespathteam.in/assets/Amazon.jpg");
-      const twitterUrl = `https://twitter.com/intent/tweet?text=${tweetText}&url=${imageUrl}`;
-      window.open(twitterUrl, '_blank');
-    };
-  </script>
 
 </body>
 </html>
