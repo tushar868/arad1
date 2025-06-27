@@ -2,79 +2,131 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Scan Billboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    body, html {
+    html, body {
       margin: 0;
       padding: 0;
-      background: black;
+      width: 100vw;
+      height: 100vh;
+      background: #000;
       overflow: hidden;
+      font-family: sans-serif;
     }
-    video, canvas {
+
+    #videoElement {
       position: absolute;
-      top: 0;
-      left: 0;
       width: 100vw;
       height: 100vh;
       object-fit: cover;
+      z-index: 1;
+    }
+
+    #overlayImage {
+      position: absolute;
+      top: 10%;
+      left: 5%;
+      width: 90vw;
+      height: auto;
+      display: none;
+      z-index: 3;
+      border-radius: 12px;
+      box-shadow: 0 0 20px rgba(255,255,255,0.8);
+    }
+
+    #loading {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      color: white;
+      font-size: 18px;
+      z-index: 10;
+    }
+
+    #postButton {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #ff6600;
+      color: white;
+      padding: 12px 24px;
+      border: none;
+      font-size: 18px;
+      border-radius: 8px;
+      z-index: 10;
+      display: none;
     }
   </style>
 </head>
 <body>
 
-<video id="video" autoplay muted playsinline></video>
-<canvas id="canvas"></canvas>
+  <video id="videoElement" autoplay playsinline></video>
+  <img id="overlayImage" src="assets/Amazon.jpg" alt="Ad Overlay">
+  <div id="loading">Scanning Billboard...</div>
+  <button id="postButton">Post on Twitter</button>
 
-<script>
-const video = document.getElementById('video');
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
+  <script>
+    const video = document.getElementById('videoElement');
+    const overlayImage = document.getElementById('overlayImage');
+    const loading = document.getElementById('loading');
+    const postButton = document.getElementById('postButton');
 
-// Load client ad image (make sure it's in same folder or update path)
-const ad = new Image();
-ad.src = 'assets/Amazon.jpg'; // or use full path if needed
-
-// Start the camera
-navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-  .then(stream => {
-    video.srcObject = stream;
-    video.onloadedmetadata = () => {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      detectLoop();
-    };
-  })
-  .catch(err => alert("Camera access denied or not available."));
-
-function detectLoop() {
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  const frameData = canvas.toDataURL('image/jpeg');
-
-  fetch('http://localhost:5000/api/detect', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ image: frameData })
-  })
-  .then(res => res.json())
-  .then(detections => {
-    // Redraw base video frame
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    // Draw client ad image over each detected box
-    detections.forEach(box => {
-      ctx.drawImage(ad, box.x, box.y, box.w, box.h);
+    // Start Camera
+    navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: 'environment',
+        width: { ideal: 640 },
+        height: { ideal: 480 }
+      }
+    }).then(stream => {
+      video.srcObject = stream;
+    }).catch(err => {
+      alert("Camera error: " + err);
     });
 
-    // Loop again
-    requestAnimationFrame(detectLoop);
-  })
-  .catch(() => {
-    // On error, just continue
-    requestAnimationFrame(detectLoop);
-  });
-}
-</script>
+    // Take frame after 4s and send to /detect
+    setTimeout(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const base64Image = canvas.toDataURL('image/jpeg');
+
+      fetch('/detect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64Image })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success || data.predicted === true) {
+          overlayImage.style.display = 'block';
+          loading.style.display = 'none';
+          // Delay 2s before showing post button
+          setTimeout(() => {
+            postButton.style.display = 'block';
+          }, 2000);
+        } else {
+          loading.innerText = 'No billboard found.';
+        }
+      })
+      .catch(err => {
+        console.error('Detection error:', err);
+        loading.innerText = 'Detection failed.';
+      });
+    }, 4000);
+
+    // Twitter Post
+    postButton.onclick = () => {
+      const tweetText = encodeURIComponent("Check out this amazing ad! #AdReveal");
+      const imageUrl = encodeURIComponent("https://demo.bytespathteam.in/assets/Amazon.jpg");
+      const twitterUrl = `https://twitter.com/intent/tweet?text=${tweetText}&url=${imageUrl}`;
+      window.open(twitterUrl, '_blank');
+    };
+  </script>
 
 </body>
 </html>
