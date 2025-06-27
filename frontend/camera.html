@@ -64,46 +64,45 @@
 
   <video id="videoElement" autoplay playsinline></video>
   <img id="overlayImage" src="assets/Amazon.jpg" alt="Ad Overlay">
+  <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
   <div id="loading">Scanning Billboard...</div>
-  <button id="postButton">Post on Twitter</button>
+  <button id="postButton" onclick="scan()">Post on Twitter</button>
 
   <script>
-let canvas = document.getElementById("canvas");
-let context = canvas.getContext("2d");
-let video = document.getElementById("videoElement");
+    let canvas = document.getElementById("canvas");
+    let context = canvas.getContext("2d");
+    let video = document.getElementById("videoElement");
 
-navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-  .then((stream) => {
-    video.srcObject = stream;
-    video.play();
-  });
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      .then((stream) => {
+        video.srcObject = stream;
+        video.play();
+      });
 
-function scan() {
-  // Wait 2 seconds to ensure curtain is visible
-  setTimeout(() => {
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    let imageData = canvas.toDataURL("image/jpeg");
+    function scan() {
+      setTimeout(() => {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        let imageData = canvas.toDataURL("image/jpeg");
 
-    fetch("https://demo.bytespathteam.in/detect", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image: imageData })
-    })
-    .then(response => response.json())
-    .then(data => {
-      if (data.found) {
-        alert("✅ Billboard Found");
-      } else {
-        alert("❌ Billboard Not Found");
-      }
-    })
-    .catch(err => {
-      console.error("Detection Error:", err);
-    });
-  }, 2000);  // Delay after curtain
-}
-</script>
-
+        fetch("https://demo.bytespathteam.in/detect", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: imageData })
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.found) {
+            alert("✅ Billboard Found");
+          } else {
+            alert("❌ Billboard Not Found");
+          }
+        })
+        .catch(err => {
+          console.error("Detection Error:", err);
+        });
+      }, 2000);
+    }
+  </script>
 
 </body>
 </html>
